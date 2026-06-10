@@ -118,9 +118,7 @@ static void g233_wdt_write(void *opaque, hwaddr offset, uint64_t value,
         }
         s->ctrl = new_ctrl;
         if (s->ctrl & G233_WDT_CTRL_EN) {
-            if (s->val == 0) {
-                s->val = s->load ? s->load : 0xFFFFFFFF;
-            }
+            s->val = s->load ? s->load : 0xFFFFFFFF;
         }
         g233_wdt_update_irq(s);
         g233_wdt_reset_timer(s);

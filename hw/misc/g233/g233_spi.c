@@ -25,6 +25,7 @@
 #include "qemu/osdep.h"
 #include "hw/core/sysbus.h"
 #include "hw/core/irq.h"
+#include "hw/core/qdev-properties.h"
 #include "hw/misc/g233.h"
 #include "hw/ssi/ssi.h"
 #include "migration/vmstate.h"
@@ -185,23 +186,25 @@ static void g233_spi_realize(DeviceState *dev, Error **errp)
     SysBusDevice *sbd = SYS_BUS_DEVICE(dev);
     G233SpiState *s = G233_SPI(dev);
     DeviceState *flash0, *flash1;
-    int i;
 
     s->spi = ssi_create_bus(dev, "spi");
     sysbus_init_irq(sbd, &s->irq);
-    for (i = 0; i < G233_SPI_NUM_CS; i++) {
-        sysbus_init_irq(sbd, &s->cs_lines[i]);
-    }
+    qdev_init_gpio_out_named(DEVICE(s), s->cs_lines, SSI_GPIO_CS,
+                             G233_SPI_NUM_CS);
 
     memory_region_init_io(&s->mmio, OBJECT(s), &g233_spi_ops, s,
                           TYPE_G233_SPI, 0x10);
     sysbus_init_mmio(sbd, &s->mmio);
 
-    /* Attach two flash chips to the shared SSI bus. */
-    flash0 = ssi_create_peripheral(s->spi, "w25x16");
+    /* Attach two flash chips to the shared SSI bus with distinct CS indices. */
+    flash0 = qdev_new("w25x16");
+    qdev_prop_set_uint8(flash0, "cs", 0);
+    qdev_realize_and_unref(flash0, BUS(s->spi), &error_fatal);
     qdev_connect_gpio_out_named(DEVICE(s), SSI_GPIO_CS, 0,
                                 qdev_get_gpio_in_named(flash0, SSI_GPIO_CS, 0));
-    flash1 = ssi_create_peripheral(s->spi, "w25x32");
+    flash1 = qdev_new("w25x32");
+    qdev_prop_set_uint8(flash1, "cs", 1);
+    qdev_realize_and_unref(flash1, BUS(s->spi), &error_fatal);
     qdev_connect_gpio_out_named(DEVICE(s), SSI_GPIO_CS, 1,
                                 qdev_get_gpio_in_named(flash1, SSI_GPIO_CS, 0));
 }
